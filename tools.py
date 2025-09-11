@@ -16,10 +16,12 @@ import random
 import requests
 import json
 import time
+from xiaozhi_open_api import XiaozhiApi
 
 # Create an MCP server
 mcp = FastMCP("tools")
 searcher = search()
+xz = XiaozhiApi("eyJhbGciOiJFUzI1NiIsInR5cCI6IkpXVCJ9.eyJ1c2VySWQiOjQ0Nzc1NCwidXNlcm5hbWUiOiJpbnphZ2hpYW4iLCJ0ZWxlcGhvbmUiOiIrODYxODYqKioqMjM0NyIsImdvb2dsZUVtYWlsIjpudWxsLCJyb2xlIjoidXNlciIsImlhdCI6MTc1NzIwMTk4OSwiZXhwIjoxNzY0OTc3OTg5fQ.jpYxPapsx3gNq2g8qwH6fOogSrKkA2XHUXhro9znx30z4Hoq_Wx4elCfffBp0CJcQawstdjkNA3okY8kgkbcxA")
 
 # Add an addition tool
 @mcp.tool()
@@ -229,69 +231,68 @@ def search_xng1(message='') -> dict:
     Returns:
         dict: 包含操作是否成功的结果
     """
-    # logger.info(f"上网搜索: {message}")
-    # url = "http://localhost:8080/search"
-    # payload = {
-    # "q": message,
-    # "format": "json"
-    # }
-    # headers = {
-    #     "Authorization": "Bearer fc-385cc35c351e4b1ebc0318523e3709b1",
-    #     "Content-Type": "application/json"
-    # }
-    # response = requests.get(url, params=payload, headers=headers)
-
-    # return (response.json())
-    return searcher.search_with_scrape(message)
-
-@mcp.tool()
-def firecrawl(msg='') -> dict:
-    """
-    当需要查看某些网址的内容时，可以使用爬虫工具获取并总结
-    Args:
-        message (str): 必须是正确的一个URL网址，注意格式和数量必须正确，不可以添加其他内容
-    Returns:
-        dict: 包含操作是否成功的结果
-    """
-    logger.info(f"爬虫工具: {msg}")
-    url = "http://localhost/v1/chat-messages"
-
-    # 替换成你的真实 API Key
-    api_key = "app-eHXDuQeeUG5TAgAnQEIRXgOj"
-    headers = {
-        "Content-Type": "application/json; charset=utf-8",
-        "Authorization": f"Bearer {api_key}",
-        'X-Custom': 'value'
-    }
-
+    logger.info(f"上网搜索: {message}")
+    url = "http://localhost:8080/search"
     payload = {
-        "inputs": {},
-        "query": msg,
-        "response_mode": "blocking", #  "blocking" or "streaming"
-        "conversation_id": "",
-        "user": "小智"
+    "q": message,
+    "format": "json"
     }
+    headers = {
+        "Authorization": "Bearer fc-385cc35c351e4b1ebc0318523e3709b1",
+        "Content-Type": "application/json"
+    }
+    response = requests.get(url, params=payload, headers=headers)
 
-    # 发送请求
-    try:
-        response = requests.post(url, headers=headers, json=payload,timeout=10000)
-        response.raise_for_status()
-        logger.info(response.text)
-    except Exception as e:
-        logger.error(f"API call error: {str(e)}")
-    return response.text
+    return (response.json())
+    # return searcher.search_with_scrape(message)
 
+# @mcp.tool()
+# def firecrawl(msg='') -> dict:
+#     """
+#     当需要查看某些网址的内容时，可以使用爬虫工具获取并总结
+#     Args:
+#         message (str): 必须是正确的一个URL网址，注意格式和数量必须正确，不可以添加其他内容
+#     Returns:
+#         dict: 包含操作是否成功的结果
+#     """
+#     logger.info(f"爬虫工具: {msg}")
+#     url = "http://localhost/v1/chat-messages"
+
+#     # 替换成你的真实 API Key
+#     api_key = "app-eHXDuQeeUG5TAgAnQEIRXgOj"
+#     headers = {
+#         "Content-Type": "application/json; charset=utf-8",
+#         "Authorization": f"Bearer {api_key}",
+#         'X-Custom': 'value'
+#     }
+
+#     payload = {
+#         "inputs": {},
+#         "query": msg,
+#         "response_mode": "blocking", #  "blocking" or "streaming"
+#         "conversation_id": "",
+#         "user": "小智"
+#     }
+
+#     # 发送请求
+#     try:
+#         response = requests.post(url, headers=headers, json=payload,timeout=10000)
+#         response.raise_for_status()
+#         logger.info(response.text)
+#     except Exception as e:
+#         logger.error(f"API call error: {str(e)}")
+#     return response.text
 @mcp.tool()
-def broadcast(msg='') -> str:
+def search_sql(message='') -> dict:
     """
-    当需要播报、广播、说出指令时调用播报工具，播出原始内容，不可以擅自修改内容
+    搜索历史，记忆查找，当用户问：还记得xxx或者你想想之前说过的话时使用这个方法
+
     Args:
-        msg (str): 要播报的内容
+        message (str): 要搜索的内容
     Returns:
         dict: 包含操作是否成功的结果
     """
-    return msg
-
+    return xz.search_content_like(message)
 # Start the server
 if __name__ == "__main__":
     mcp.run(transport="stdio")
