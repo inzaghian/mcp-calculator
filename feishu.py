@@ -135,13 +135,13 @@ if __name__ == "__main__":
                         # self_.send_msg_to_chat(data_dict.get("event").get("message").get("chat_id"), f"from p2p {content.get("text")}".replace("\"", "\\\""))
                         self.mqtt.publish(
                             self.DOWN_STREAM_TOPIC, 
-                            f"{content.get("text")}".replace("\"", "\\\"")
+                            f"{content.get('text')}".replace("\"", "\\\"")
                         )
                     elif chat_type == "group":
                         # self_.send_msg_to_chat(data_dict.get("event").get("message").get("chat_id"), f"from group {content.get("text")}".replace("\"", "\\\""))
                         self.mqtt.publish(
                             self.DOWN_STREAM_TOPIC, 
-                            f"{content.get("text")}".replace("\"", "\\\"")
+                            f"{content.get('text')}".replace("\"", "\\\"")
                         )
             except Exception as e:
                 logger.error(e)
