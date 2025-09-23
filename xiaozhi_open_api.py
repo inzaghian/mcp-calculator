@@ -2,7 +2,7 @@ import requests
 import json
 import logging
 import time
-from p3_tools import convert_audio_to_p3,play_p3,convert_p3_to_audio
+from p3_tools import convert_audio_to_p3
 import os
 from datetime import datetime
 from Cloudflare_open_api import CloudFlare
@@ -272,9 +272,11 @@ class XiaozhiApi:
                     a.assistant_name=i.get("assistant_name")
                     a.user_name =i.get("user_name")
                     a.created_at=i.get("created_at")
-                    a.created_at_utc = iso_to_timestamp(a.created_at)
+                    if a.created_at:
+                        a.created_at_utc = iso_to_timestamp(a.created_at)
                     a.updated_at=i.get("updated_at")
-                    a.updated_at_utc = iso_to_timestamp(a.updated_at)
+                    if a.updated_at:
+                        a.updated_at_utc = iso_to_timestamp(a.updated_at)
                     a.memory=i.get("memory")
                     a.character=i.get("character")
                     a.long_memory_switch=i.get("long_memory_switch")
@@ -284,15 +286,18 @@ class XiaozhiApi:
                     a.asr_speed=i.get("asr_speed")
                     a.tts_pitch=i.get("tts_pitch")
                     a.memory_updated_at=i.get("memory_updated_at")
-                    a.memory_updated_at_utc=iso_to_timestamp(a.memory_updated_at)
+                    if a.memory_updated_at:
+                        a.memory_updated_at_utc=iso_to_timestamp(a.memory_updated_at)
                     a.last_device=self.device()
                     if i.get("last_device") is not None:
                         a.last_device.id=i.get("last_device").get("id")
                         a.last_device.mac_address=i.get("last_device").get("mac_address")
                         a.last_device.created_at=i.get("last_device").get("created_at")
-                        a.last_device.created_at_utc=iso_to_timestamp(a.last_device.created_at)
+                        if a.last_device.created_at:
+                            a.last_device.created_at_utc=iso_to_timestamp(a.last_device.created_at)
                         a.last_device.updated_at=i.get("last_device").get("updated_at")
-                        a.last_device.updated_at_utc=iso_to_timestamp(a.last_device.updated_at)
+                        if a.last_device.updated_at:
+                            a.last_device.updated_at_utc=iso_to_timestamp(a.last_device.updated_at)
                         a.last_device.last_connected_at=i.get("last_device").get("last_connected_at")
                         a.last_device.auto_update=i.get("last_device").get("auto_update")
                         a.last_device.alias=i.get("last_device").get("alias")
@@ -373,7 +378,8 @@ class XiaozhiApi:
                     a.user_id=i.get('user_id')
                     a.chat_id=i.get('chat_id')
                     a.created_at=i.get('created_at')
-                    a.created_at_utc=iso_to_timestamp(a.created_at)
+                    if a.created_at:
+                        a.created_at_utc=iso_to_timestamp(a.created_at)
                     a.device_id=i.get('device_id')
                     a.msg_count=i.get('msg_count')
                     a.agent_id=i.get('agent_id')
@@ -420,7 +426,8 @@ class XiaozhiApi:
                     a.content=i.get("content")
                     a.voice_embedding_id=i.get("voice_embedding_id")
                     a.created_at=i.get("created_at")
-                    a.created_at_utc=iso_to_timestamp(a.created_at)
+                    if a.created_at:
+                        a.created_at_utc=iso_to_timestamp(a.created_at)
                     a.name=i.get("name")
                     a.prompt_tokens=i.get("prompt_tokens")
                     a.total_tokens=i.get("total_tokens")
@@ -727,61 +734,82 @@ class XiaozhiApi:
     
 
 if __name__ == "__main__":
+    import logging
+    import time
+    import sys
+    import os
+    import json
+    import signal
+    import schedule
+    
+    from xiaozhi_open_api import XiaozhiApi
+
+
+    class Application:
+        def __init__(self, token:str):
+            self.xz = XiaozhiApi(token)
+
+        def synch(self):
+            logger.info(f"synch")
+            self.xz.create_agent_table()
+            self.xz.create_device_table()
+            self.xz.create_chats_table()
+            self.xz.create_messages_table()
+            self.xz.create_voice_table()
+            agent_list = self.xz.agents_update() #update agent
+            if agent_list:
+                for agent in agent_list:
+                    agent_db = self.xz.get_agent_from_db(agent.id)
+                    if agent_db:
+                        logger.info(agent_db)
+                    else:
+                        self.xz.insert_agent(agent)  #insert agent
+                    cur_agent = self.xz.chats_update(agent) #update chat list
+                    for device in agent.device_list:
+                        device_db = self.xz.get_device_from_db(device.id)
+                        if device_db:
+                            logger.info(device_db)
+                        else:
+                            self.xz.insert_device(device)
+                    for chat in agent.chat_list:
+                        chat_db = self.xz.get_chat_from_db(chat.id)
+                        if chat_db:
+                            logger.info(chat_db)
+                        else:
+                            self.xz.insert_chat(chat)
+                            #only chat not found update message
+                            cur_chat = self.xz.messages_update(agent, chat)  #update message list
+                            for msg in chat.msg_list:
+                                msg_db = self.xz.get_message_from_db(msg.id)
+                                if msg_db:
+                                    pass
+                                else:
+                                    self.xz.insert_message(msg)
+                                    if msg.url:
+                                        wav_file = self.xz.temp_path + f'/{msg.id}.wav'
+                                        p3_path = self.xz.temp_path + f'/{msg.id}.p3'
+                                        if download_url(msg.url, wav_file):
+                                            convert_audio_to_p3.encode_audio_to_opus(wav_file, p3_path)
+                                            os.remove(wav_file)
+                                            if os.path.exists(p3_path):
+                                                with open(p3_path, 'rb') as p3:
+                                                    voice = p3.read()
+                                                    self.xz.insert_voice(msg, voice)
+            logger.info(f"synch end")
+
     logging.basicConfig(level=logging.INFO)
     logger = logging.getLogger("main")
     # 使用示例
 
-    xz = XiaozhiApi("eyJhbGciOiJFUzI1NiIsInR5cCI6IkpXVCJ9.eyJ1c2VySWQiOjQ0Nzc1NCwidXNlcm5hbWUiOiJpbnphZ2hpYW4iLCJ0ZWxlcGhvbmUiOiIrODYxODYqKioqMjM0NyIsImdvb2dsZUVtYWlsIjpudWxsLCJyb2xlIjoidXNlciIsImlhdCI6MTc1NzIwMTk4OSwiZXhwIjoxNzY0OTc3OTg5fQ.jpYxPapsx3gNq2g8qwH6fOogSrKkA2XHUXhro9znx30z4Hoq_Wx4elCfffBp0CJcQawstdjkNA3okY8kgkbcxA")
-    # print(xz.search_content_like('火锅'))
-
-    xz.create_agent_table()
-    time.sleep(0.01)
-    xz.create_device_table()
-    time.sleep(0.01)
-    xz.create_chats_table()
-    time.sleep(0.01)
-    xz.create_messages_table()
-    time.sleep(0.01)
-    xz.create_voice_table()
-    time.sleep(0.01)
-    agent_list = xz.agents_update() #update agent
-    if agent_list:
-        for agent in agent_list:
-            agent_db = xz.get_agent_from_db(agent.id)
-            if agent_db:
-                logger.info(agent_db)
-            else:
-                xz.insert_agent(agent)  #insert agent
-            cur_agent = xz.chats_update(agent) #update chat list
-            for device in agent.device_list:
-                device_db = xz.get_device_from_db(device.id)
-                if device_db:
-                    logger.info(device_db)
-                else:
-                    xz.insert_device(device)
-            for chat in agent.chat_list:
-                chat_db = xz.get_chat_from_db(chat.id)
-                if chat_db:
-                    logger.info(chat_db)
-                else:
-                    xz.insert_chat(chat)
-                    #only chat not found update message
-                cur_chat = xz.messages_update(agent, chat)  #update message list
-                for msg in chat.msg_list:
-                    msg_db = xz.get_message_from_db(msg.id)
-                    if msg_db:
-                        pass
-                    else:
-                        xz.insert_message(msg)
-                        if msg.url:
-                            wav_file = xz.temp_path + f'/{msg.id}.wav'
-                            p3_path = xz.temp_path + f'/{msg.id}.p3'
-                            if download_url(msg.url, wav_file):
-                                convert_audio_to_p3.encode_audio_to_opus(wav_file, p3_path)
-                                os.remove(wav_file)
-                                if os.path.exists(p3_path):
-                                    with open(p3_path, 'rb') as p3:
-                                        voice = p3.read()
-                                        xz.insert_voice(msg, voice)
-
-
+    token = os.environ.get('xiaozhi_token')
+    if token is None:
+        logger.error("xiaozhi_token is None")
+        sys.exit(1)
+    app = Application(token)
+    # 每天10:30执行
+    schedule.every().day.at("14:45").do(app.synch)
+    logger.info("start")
+    # 持续运行调度器
+    while True:
+        schedule.run_pending()
+        time.sleep(1) 

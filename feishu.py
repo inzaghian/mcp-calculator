@@ -5,7 +5,9 @@ import json
 import threading
 import lark_oapi as lark
 from lark_oapi.api.im.v1 import *
+import logging
 
+logger = logging.getLogger("feishu")
 class feishu_client:
 
     def __init__(self, app_id, app_secret):
@@ -82,68 +84,81 @@ class feishu_client:
         # lark.logger.info(lark.JSON.marshal(response.data, indent=4))
 
 
-
 if __name__ == "__main__":
     import time
-    from mqtt_client import MQTTSubscriber
-
+    import os
+    import sys
+    import signal
+    from mqtt_client import MQTTSubscriber, mqtt
+    logging.basicConfig(level=logging.INFO)
 
     class application:
-        # 配置（从环境变量或配置文件读取更安全）
-        BROKER = "xxx"
-        PORT = 1883
-        USERNAME = "admin"  # 公共代理无需认证
-        PASSWORD = "admin"
-        TOPIC = "test/mqtt_topic"
-        UP_STREAM_TOPIC = "feishu/upstream"
-        DOWN_STREAM_TOPIC = "feishu/downstream"
-        
-        APP_ID = "xxxx"
-        APP_SECRET = "xxxx"
         def __init__(self):
-            self.mqtt = MQTTSubscriber(self.on_message, self.BROKER, self.PORT, self.USERNAME, self.PASSWORD)
+            signal.signal(signal.SIGINT, self.signal_handler)
+            self.BROKER = os.environ.get('mqtt_broker')
+            self.PORT = int(os.environ.get('mqtt_port'))
+            self.USERNAME = os.environ.get('mqtt_username')
+            self.PASSWORD = os.environ.get('mqtt_password')
+            self.UP_STREAM_TOPIC = os.environ.get('mqtt_up_stream_topic')
+            self.DOWN_STREAM_TOPIC = os.environ.get('mqtt_down_stream_topic')
+            self.APP_ID = os.environ.get('feishu_app_id')
+            self.APP_SECRET = os.environ.get('feishu_app_secret')
+            self.mqtt = MQTTSubscriber(self.BROKER, self.PORT, self.USERNAME, self.PASSWORD)
+            self.mqtt.client.on_connect = self.on_mqtt_connect
+            self.mqtt.client.on_message = self.on_mqtt_message
             self.mqtt.start()
-            # self.mqtt.publish("test/mqtt_topic", "python sended")
-            # self.mqtt.subscribe(self.TOPIC)
-            self.mqtt.subscribe(self.UP_STREAM_TOPIC)
-            # self.mqtt.subscribe(self.DOWN_STREAM_TOPIC)
-            
-            # 建立长连接 Establish persistent connection
             self.cli = feishu_client(self.APP_ID, self.APP_SECRET)
-            # cli.send_msg_to_user(26817659, "hello")
-            self.cli.listen(self.env_h)
+            self.cli.listen(self.on_feishu_message)
+            
+        def on_mqtt_connect(self, client:mqtt.Client, userdata, flags, rc:int):
+            if rc==0:
+                self.mqtt.subscribe(self.UP_STREAM_TOPIC)
 
-        def on_message(self, _self:MQTTSubscriber, msg):
-            self.cli.send_msg_to_user(26817659, msg)
-            print(msg)
+        def on_mqtt_message(self, client:mqtt.Client, userdata, msg:mqtt.MQTTMessage):
+            if msg.topic == self.UP_STREAM_TOPIC:
+                msg = msg.payload.decode()
+                self.cli.send_msg_to_user(26817659, msg)
+                logger.info(msg)
+            elif msg.topic == self.DOWN_STREAM_TOPIC:
+                msg = msg.payload.decode()
+                logger.info(f"down stream:{msg}")
 
-
-        def env_h(self, _self:feishu_client, data:str):
+        def on_feishu_message(self, _self:feishu_client, data:str):
             try:
                 data_dict:dict = json.loads(data)
+                logger.info(data_dict)
                 chat_type = data_dict.get("event").get("message").get("chat_type")
                 content:dict = json.loads(data_dict.get("event").get("message").get("content"))
 
                 if data_dict.get("event").get("message").get("message_type") == "text":
                     if chat_type == "p2p":
                         # self_.send_msg_to_chat(data_dict.get("event").get("message").get("chat_id"), f"from p2p {content.get("text")}".replace("\"", "\\\""))
-                        self.mqtt.publish(self.DOWN_STREAM_TOPIC, f"{content.get("text")}".replace("\"", "\\\""))
-                        pass
+                        self.mqtt.publish(
+                            self.DOWN_STREAM_TOPIC, 
+                            f"{content.get("text")}".replace("\"", "\\\"")
+                        )
                     elif chat_type == "group":
                         # self_.send_msg_to_chat(data_dict.get("event").get("message").get("chat_id"), f"from group {content.get("text")}".replace("\"", "\\\""))
-                        pass
+                        self.mqtt.publish(
+                            self.DOWN_STREAM_TOPIC, 
+                            f"{content.get("text")}".replace("\"", "\\\"")
+                        )
             except Exception as e:
-                print(e)
-
-
-    
+                logger.error(e)
+        def signal_handler(self, sig, frame):
+            """Handle interrupt signals"""
+            logger.info("Received interrupt signal, shutting down...")
+            sys.exit(0)
 
     app = application()
-    while True:  # 主线程可执行其他任务
-        time.sleep(3)
-        # cli.send_msg_to_user(26817659, "hello")
-        # cli.send_msg_to_chat("oc_76cfae567ba3e549cbf5db50abce80f8", "hello")
-        # print("runing")
+    try:
+        while True:  # 主线程可执行其他任务
+            time.sleep(1)
+    except KeyboardInterrupt:
+        logger.info("Program interrupted by user")
+    except Exception as e:
+        logger.error(f"Program execution error: {e}")
+
 
 
     

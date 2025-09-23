@@ -16,12 +16,16 @@ import random
 import requests
 import json
 import time
+import os
 from xiaozhi_open_api import XiaozhiApi
-
 # Create an MCP server
 mcp = FastMCP("tools")
 searcher = search()
-xz = XiaozhiApi("eyJhbGciOiJFUzI1NiIsInR5cCI6IkpXVCJ9.eyJ1c2VySWQiOjQ0Nzc1NCwidXNlcm5hbWUiOiJpbnphZ2hpYW4iLCJ0ZWxlcGhvbmUiOiIrODYxODYqKioqMjM0NyIsImdvb2dsZUVtYWlsIjpudWxsLCJyb2xlIjoidXNlciIsImlhdCI6MTc1NzIwMTk4OSwiZXhwIjoxNzY0OTc3OTg5fQ.jpYxPapsx3gNq2g8qwH6fOogSrKkA2XHUXhro9znx30z4Hoq_Wx4elCfffBp0CJcQawstdjkNA3okY8kgkbcxA")
+token = os.environ.get('xiaozhi_token')
+if token is None:
+    logger.error("xiaozhi_token is None")
+
+xz = XiaozhiApi(token)
 
 # Add an addition tool
 @mcp.tool()
