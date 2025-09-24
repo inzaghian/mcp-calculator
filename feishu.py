@@ -117,7 +117,8 @@ if __name__ == "__main__":
         def on_mqtt_message(self, client:mqtt.Client, userdata, msg:mqtt.MQTTMessage):
             if msg.topic == self.UP_STREAM_TOPIC:
                 msg = msg.payload.decode()
-                self.cli.send_msg_to_user(26817659, msg)
+                msg_dict:dict = json.loads(msg)
+                self.cli.send_msg_to_chat(msg_dict.get("chat_id"), msg_dict.get("payload"))
                 logger.info(msg)
             elif msg.topic == self.DOWN_STREAM_TOPIC:
                 msg = msg.payload.decode()
@@ -133,15 +134,26 @@ if __name__ == "__main__":
                 if data_dict.get("event").get("message").get("message_type") == "text":
                     if chat_type == "p2p":
                         # self_.send_msg_to_chat(data_dict.get("event").get("message").get("chat_id"), f"from p2p {content.get("text")}".replace("\"", "\\\""))
+                        data_tx:dict = {
+                            "type": "text",
+                            "chat_id": data_dict.get("event").get("message").get("chat_id"),
+                            "payload": f"{content.get('text')}"
+                        }
                         self.mqtt.publish(
                             self.DOWN_STREAM_TOPIC, 
-                            f"{content.get('text')}".replace("\"", "\\\"")
+                            str(data_tx).replace("\"", "\\\"").replace("'", "\"")
+                            # f"{content.get('text')}".replace("\"", "\\\"")
                         )
                     elif chat_type == "group":
                         # self_.send_msg_to_chat(data_dict.get("event").get("message").get("chat_id"), f"from group {content.get("text")}".replace("\"", "\\\""))
+                        data_tx:dict = {
+                            "type": "text",
+                            "chat_id": data_dict.get("event").get("message").get("chat_id"),
+                            "payload": f"{content.get('text')}"
+                        }
                         self.mqtt.publish(
                             self.DOWN_STREAM_TOPIC, 
-                            f"{content.get('text')}".replace("\"", "\\\"")
+                            str(data_tx).replace("\"", "\\\"").replace("'", "\"")
                         )
             except Exception as e:
                 logger.error(e)
