@@ -18,6 +18,7 @@ import json
 import time
 import os
 from xiaozhi_open_api import XiaozhiApi
+from feishu import feishu_client
 # Create an MCP server
 mcp = FastMCP("tools")
 searcher = search()
@@ -26,6 +27,9 @@ if token is None:
     logger.error("xiaozhi_token is None")
 
 xz = XiaozhiApi(token)
+APP_ID = os.environ.get('feishu_app_id')
+APP_SECRET = os.environ.get('feishu_app_secret')
+fs = feishu_client(app_id=APP_ID, app_secret=APP_SECRET)
 
 # Add an addition tool
 @mcp.tool()
@@ -38,7 +42,7 @@ def calculator(python_expression: str) -> dict:
 @mcp.tool()
 def send_feishu_message(message: str, title: str = "系统通知") -> dict:
     """
-    给猴猴发消息
+    发送飞书消息，当用户要发消息时，或者要求和某人说话时，可以使用这个工具。
     
     Args:
         message (str): 要发送的消息内容
@@ -91,22 +95,27 @@ def send_feishu_message(message: str, title: str = "系统通知") -> dict:
     }
     
     try:
-        # 发送POST请求
-        headers = {"Content-Type": "application/json"}
-        response = requests.post(webhook_url, data=json.dumps(payload), headers=headers)
-        
-        # 检查响应
-        if response.status_code == 200:
-            result = response.json()
-            if result.get("code") == 0:
-                return {"success": True, "message": "飞书消息发送成功"}
-            else:
-                return {"success": False, "message": f"飞书消息发送失败: {result.get('msg', '未知错误')}"}
+        ret = fs.send_msg_to_chat(chat_id="oc_2f8175db252c0b71b5d47c364f494ca8", msg=json.dumps(payload))
+        if ret == True:
+            return {"success": True, "message": "飞书消息发送成功"}
         else:
-            return {"success": False, "message": f"HTTP错误: {response.status_code}"}
+            return {"success": False, "message": f"飞书消息发送失败: {ret}"}
+    #     # 发送POST请求
+    #     headers = {"Content-Type": "application/json"}
+    #     response = requests.post(webhook_url, data=json.dumps(payload), headers=headers)
+        
+    #     # 检查响应
+    #     if response.status_code == 200:
+    #         result = response.json()
+    #         if result.get("code") == 0:
+    #             return {"success": True, "message": "飞书消息发送成功"}
+    #         else:
+    #             return {"success": False, "message": f"飞书消息发送失败: {result.get('msg', '未知错误')}"}
+    #     else:
+    #         return {"success": False, "message": f"HTTP错误: {response.status_code}"}
             
-    except requests.exceptions.RequestException as e:
-        logger.error(f"飞书消息发送请求异常: {e}")
+    # except requests.exceptions.RequestException as e:
+    #     logger.error(f"飞书消息发送请求异常: {e}")
         return {"success": False, "message": f"网络请求异常: {e}"}
     except Exception as e:
         logger.error(f"飞书消息发送失败: {e}")
@@ -228,7 +237,7 @@ def meal_search(key) -> dict:
 @mcp.tool()
 def search_xng1(message='') -> dict:
     """
-    上网搜索
+    上网搜索，当用户需要查找某些信息时，可以使用这个工具
 
     Args:
         message (str): 要搜索的内容
