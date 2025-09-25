@@ -36,14 +36,14 @@ class feishu_client:
             self.event_handle(self, lark.JSON.marshal(data, indent=4))
 
 
-    def send_msg_to_user(self, user_id, content)->bool:
+    def send_msg_to_user(self, user_id, msg)->bool:
             # 构造请求对象
         request: CreateMessageRequest = CreateMessageRequest.builder() \
             .receive_id_type("user_id") \
             .request_body(CreateMessageRequestBody.builder()
                 .receive_id(f"{user_id}")
                 .msg_type("text")
-                .content(f"{{\"text\":\"{content}\"}}")
+                .content(f"{{\"text\":\"{msg}\"}}")
                 .build()) \
             .build()
 
@@ -130,6 +130,14 @@ if __name__ == "__main__":
                 logger.info(data_dict)
                 chat_type = data_dict.get("event").get("message").get("chat_type")
                 content:dict = json.loads(data_dict.get("event").get("message").get("content"))
+                user_id = data_dict.get("event").get("sender").get("sender_id").get("user_id")
+                speaker = ""
+                if user_id == "37bg232d":
+                    speaker = "主人: "
+                elif user_id == "d74594e8":
+                    speaker = "猴猴姐姐: "
+                else:
+                    speaker = " "
 
                 if data_dict.get("event").get("message").get("message_type") == "text":
                     if chat_type == "p2p":
@@ -137,7 +145,7 @@ if __name__ == "__main__":
                         data_tx:dict = {
                             "type": "text",
                             "chat_id": data_dict.get("event").get("message").get("chat_id"),
-                            "payload": f"{content.get('text')}"
+                            "payload": f"{speaker}{content.get('text')}"
                         }
                         self.mqtt.publish(
                             self.DOWN_STREAM_TOPIC, 
@@ -149,7 +157,7 @@ if __name__ == "__main__":
                         data_tx:dict = {
                             "type": "text",
                             "chat_id": data_dict.get("event").get("message").get("chat_id"),
-                            "payload": f"{content.get('text')}"
+                            "payload": f"{speaker}:{content.get('text')}"
                         }
                         self.mqtt.publish(
                             self.DOWN_STREAM_TOPIC, 

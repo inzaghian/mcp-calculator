@@ -17,14 +17,18 @@ import requests
 import json
 import time
 import os
+import logging
 from xiaozhi_open_api import XiaozhiApi
 from feishu import feishu_client
+
+logger=logging.getLogger('tools')
 # Create an MCP server
 mcp = FastMCP("tools")
 searcher = search()
 token = os.environ.get('xiaozhi_token')
 if token is None:
     logger.error("xiaozhi_token is None")
+logger.info(f"xiaozhi_token: {token}")
 
 xz = XiaozhiApi(token)
 APP_ID = os.environ.get('feishu_app_id')
@@ -40,22 +44,18 @@ def calculator(python_expression: str) -> dict:
     return {"success": True, "result": result}
 # Add an addition tool
 @mcp.tool()
-def send_feishu_message(message: str, title: str = "系统通知") -> dict:
+def send_feishu_message(user: str, message: str = "系统通知") -> dict:
     """
-    发送飞书消息，当用户要发消息时，或者要求和某人说话时，可以使用这个工具。
+    发送飞书消息给指定用户（user枚举: owner代表主人,monkey代表猴猴， other代表其他人)
     
     Args:
-        message (str): 要发送的消息内容
-        title (str): 消息标题，默认为"系统通知"
-    
+        user (str): ["owner", "monkey"，"other"] 
+        message (str): 消息内容
     Returns:
         dict: 包含操作是否成功的结果
     """
-    logger.info(f"发送飞书消息: {title} - {message}")
-    
-    # 构建飞书Webhook URL
-    webhook_url = f"https://open.feishu.cn/open-apis/bot/v2/hook/963dcb5d-6717-41a2-baa0-264fa0a88df1"
-    
+    logger.info(f"发送飞书消息: {user} - {message}")
+
     # 构建请求数据
     payload = {
         "msg_type": "interactive",
@@ -66,7 +66,7 @@ def send_feishu_message(message: str, title: str = "系统通知") -> dict:
             "header": {
                 "title": {
                     "tag": "plain_text",
-                    "content": title
+                    "content": user
                 },
                 "template": "blue"  # 蓝色主题
             },
@@ -95,28 +95,17 @@ def send_feishu_message(message: str, title: str = "系统通知") -> dict:
     }
     
     try:
-        ret = fs.send_msg_to_chat(chat_id="oc_2f8175db252c0b71b5d47c364f494ca8", msg=json.dumps(payload))
+        if user == "owner":
+            ret = fs.send_msg_to_user(user_id="37bg232d", msg=message)
+        elif user == "monkey":
+            ret = fs.send_msg_to_user(user_id="d74594e8", msg=message)
+        else:
+            ret = fs.send_msg_to_chat(chat_id="oc_37657c6c172643bc9dbc9785b5b9725e", msg=message)
         if ret == True:
             return {"success": True, "message": "飞书消息发送成功"}
         else:
             return {"success": False, "message": f"飞书消息发送失败: {ret}"}
-    #     # 发送POST请求
-    #     headers = {"Content-Type": "application/json"}
-    #     response = requests.post(webhook_url, data=json.dumps(payload), headers=headers)
-        
-    #     # 检查响应
-    #     if response.status_code == 200:
-    #         result = response.json()
-    #         if result.get("code") == 0:
-    #             return {"success": True, "message": "飞书消息发送成功"}
-    #         else:
-    #             return {"success": False, "message": f"飞书消息发送失败: {result.get('msg', '未知错误')}"}
-    #     else:
-    #         return {"success": False, "message": f"HTTP错误: {response.status_code}"}
-            
-    # except requests.exceptions.RequestException as e:
-    #     logger.error(f"飞书消息发送请求异常: {e}")
-        return {"success": False, "message": f"网络请求异常: {e}"}
+
     except Exception as e:
         logger.error(f"飞书消息发送失败: {e}")
         return {"success": False, "message": f"发送失败: {e}"}
@@ -235,7 +224,7 @@ def meal_search(key) -> dict:
     return response.text
 
 @mcp.tool()
-def search_xng1(message='') -> dict:
+def search_xng(message='') -> dict:
     """
     上网搜索，当用户需要查找某些信息时，可以使用这个工具
 
@@ -245,7 +234,7 @@ def search_xng1(message='') -> dict:
         dict: 包含操作是否成功的结果
     """
     logger.info(f"上网搜索: {message}")
-    url = "http://localhost:8080/search"
+    url = "http://101.43.187.112:8080/search"
     payload = {
     "q": message,
     "format": "json"
