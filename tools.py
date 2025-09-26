@@ -1,48 +1,29 @@
 # server.py
-from mcp.server.fastmcp import FastMCP
-import sys
-import logging
-from search import search
-
-logger = logging.getLogger('tools')
-
-# Fix UTF-8 encoding for Windows console
-# if sys.platform == 'win32':
-#     sys.stderr.reconfigure(encoding='utf-8')
-#     sys.stdout.reconfigure(encoding='utf-8')
-
-import math
-import random
 import requests
-import json
 import time
 import os
 import logging
+from mcp.server.fastmcp import FastMCP
+from search import search
 from xiaozhi_open_api import XiaozhiApi
 from feishu import feishu_client
 
+
 logger=logging.getLogger('tools')
+logger.info("tools start")
+
 # Create an MCP server
 mcp = FastMCP("tools")
 searcher = search()
 token = os.environ.get('xiaozhi_token')
 if token is None:
     logger.error("xiaozhi_token is None")
-logger.info(f"xiaozhi_token: {token}")
 
 xz = XiaozhiApi(token)
 APP_ID = os.environ.get('feishu_app_id')
 APP_SECRET = os.environ.get('feishu_app_secret')
 fs = feishu_client(app_id=APP_ID, app_secret=APP_SECRET)
 
-# Add an addition tool
-@mcp.tool()
-def calculator(python_expression: str) -> dict:
-    """For mathamatical calculation, always use this tool to calculate the result of a python expression. You can use 'math' or 'random' directly, without 'import'."""
-    result = eval(python_expression, {"math": math, "random": random})
-    logger.info(f"Calculating formula: {python_expression}, result: {result}")
-    return {"success": True, "result": result}
-# Add an addition tool
 @mcp.tool()
 def send_feishu_message(user: str, message: str = "系统通知") -> dict:
     """
@@ -226,7 +207,7 @@ def meal_search(key) -> dict:
 @mcp.tool()
 def search_xng(message='') -> dict:
     """
-    上网搜索，当用户需要查找某些信息时，可以使用这个工具
+    上网搜索
 
     Args:
         message (str): 要搜索的内容
@@ -247,53 +228,30 @@ def search_xng(message='') -> dict:
 
     return (response.json())
     # return searcher.search_with_scrape(message)
-
-# @mcp.tool()
-# def firecrawl(msg='') -> dict:
-#     """
-#     当需要查看某些网址的内容时，可以使用爬虫工具获取并总结
-#     Args:
-#         message (str): 必须是正确的一个URL网址，注意格式和数量必须正确，不可以添加其他内容
-#     Returns:
-#         dict: 包含操作是否成功的结果
-#     """
-#     logger.info(f"爬虫工具: {msg}")
-#     url = "http://localhost/v1/chat-messages"
-
-#     # 替换成你的真实 API Key
-#     api_key = "app-eHXDuQeeUG5TAgAnQEIRXgOj"
-#     headers = {
-#         "Content-Type": "application/json; charset=utf-8",
-#         "Authorization": f"Bearer {api_key}",
-#         'X-Custom': 'value'
-#     }
-
-#     payload = {
-#         "inputs": {},
-#         "query": msg,
-#         "response_mode": "blocking", #  "blocking" or "streaming"
-#         "conversation_id": "",
-#         "user": "小智"
-#     }
-
-#     # 发送请求
-#     try:
-#         response = requests.post(url, headers=headers, json=payload,timeout=10000)
-#         response.raise_for_status()
-#         logger.info(response.text)
-#     except Exception as e:
-#         logger.error(f"API call error: {str(e)}")
-#     return response.text
 @mcp.tool()
-def search_sql(message='') -> dict:
+def scrape(url='') -> dict:
     """
-    搜索历史，记忆查找，当用户问：还记得xxx或者你想想之前说过的话时使用这个方法
+    总结网站
 
     Args:
         message (str): 要搜索的内容
     Returns:
         dict: 包含操作是否成功的结果
     """
+    logger.info(f"总结网站: {url}")
+    return searcher.scrape(url)
+
+@mcp.tool()
+def search_sql(message='') -> dict:
+    """
+    数据库搜索
+
+    Args:
+        message (str): 要搜索的内容
+    Returns:
+        dict: 包含操作是否成功的结果
+    """
+    logger.info(f"数据库搜索: {message}")
     return xz.search_content_like(message)
 # Start the server
 if __name__ == "__main__":
